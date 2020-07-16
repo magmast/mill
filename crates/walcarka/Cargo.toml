@@ -1,0 +1,29 @@
+[package]
+authors = ["Maciej Augustyniak <augustyniak.maciej@protonmail.com>"]
+edition = "2018"
+readme = "README.md"
+name = "walcarka"
+version = "0.1.0"
+
+[dependencies]
+cortex-m = "0.6.0"
+cortex-m-rt = "0.6.10"
+cortex-m-semihosting = "0.3.3"
+embedded-hal = "0.2.4"
+panic-halt = "0.2.0"
+
+[dependencies.arrayvec]
+version = "0.5.1"
+default-features = false
+
+[dependencies.hd44780-driver]
+git = "https://github.com/JohnDoneth/hd44780-driver"
+
+[dependencies.stm32f1xx-hal]
+version = "0.6.1"
+features = ["medium", "rt", "stm32f103"]
+
+[[bin]]
+name = "walcarka"
+test = false
+bench = false
