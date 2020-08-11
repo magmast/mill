@@ -2,9 +2,9 @@
 # It is not intended for manual editing.
 [[package]]
 name = "aligned"
-version = "0.3.2"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb1ce8b3382016136ab1d31a1b5ce807144f8b7eb2d5f16b2108f0f07edceb94"
+checksum = "c19796bd8d477f1a9d4ac2465b464a8b1359474f06a96bb3cda650b4fca309bf"
 dependencies = [
  "as-slice",
 ]
@@ -36,6 +36,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "bitfield"
+version = "0.13.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46afbd2983a5d5a7bd740ccb198caf5b82f45c40c09c0eed36052d91cb92e719"
+
+[[package]]
 name = "cast"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -46,12 +52,13 @@ dependencies = [
 
 [[package]]
 name = "cortex-m"
-version = "0.6.2"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2954942fbbdd49996704e6f048ce57567c3e1a4e2dc59b41ae9fde06a01fc763"
+checksum = "2be99930c99669a74d986f7fd2162085498b322e6daae8ef63a97cc9ac1dc73c"
 dependencies = [
  "aligned",
  "bare-metal",
+ "bitfield",
  "volatile-register",
 ]
 
@@ -116,9 +123,24 @@ dependencies = [
 [[package]]
 name = "hd44780-driver"
 version = "0.3.0"
-source = "git+https://github.com/JohnDoneth/hd44780-driver#a12f4385799ada828a19b53c77b1cc3cd939dc0e"
+source = "git+https://github.com/JohnDoneth/hd44780-driver#84a30c5ae793f5bce268424eb3a539143d54cf89"
 dependencies = [
  "embedded-hal",
+]
+
+[[package]]
+name = "mill"
+version = "0.1.0"
+dependencies = [
+ "arrayvec",
+ "cortex-m",
+ "cortex-m-rt",
+ "cortex-m-semihosting",
+ "embedded-hal",
+ "hd44780-driver",
+ "panic-halt",
+ "panic-semihosting",
+ "stm32f1xx-hal",
 ]
 
 [[package]]
@@ -143,10 +165,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "de96540e0ebde571dc55c73d60ef407c653844e6f9a1e2fdbd40c07b9252d812"
 
 [[package]]
-name = "proc-macro2"
-version = "1.0.18"
+name = "panic-semihosting"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "beae6331a816b1f65d04c45b078fd8e6c93e8071771f41b8163255bbd8d7c8fa"
+checksum = "c03864ac862876c16a308f5286f4aa217f1a69ac45df87ad3cd2847f818a642c"
+dependencies = [
+ "cortex-m",
+ "cortex-m-semihosting",
+]
+
+[[package]]
+name = "proc-macro2"
+version = "1.0.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "04f5f085b5d71e2188cb8271e5da0161ad52c3f227a661a3c135fdf28e258b12"
 dependencies = [
  "unicode-xid",
 ]
@@ -226,9 +258,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "1.0.34"
+version = "1.0.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "936cae2873c940d92e697597c5eee105fb570cd5689c695806f672883653349b"
+checksum = "e69abc24912995b3038597a7a593be5053eb0fb44f3cc5beec0deb421790c1f4"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -266,18 +298,4 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0d67cb4616d99b940db1d6bd28844ff97108b498a6ca850e5b6191a532063286"
 dependencies = [
  "vcell",
-]
-
-[[package]]
-name = "walcarka"
-version = "0.1.0"
-dependencies = [
- "arrayvec",
- "cortex-m",
- "cortex-m-rt",
- "cortex-m-semihosting",
- "embedded-hal",
- "hd44780-driver",
- "panic-halt",
- "stm32f1xx-hal",
 ]
