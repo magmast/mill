@@ -85,14 +85,14 @@ where
         delay: &mut (impl DelayMs<u8> + DelayUs<u16>),
     ) -> Result<(), ScreenUpdateError> {
         let content = height_to_string(height)?;
-        self.hd44780.set_cursor_pos(16 + 5, delay)?;
+        self.hd44780.set_cursor_pos(40 + 5, delay)?;
         self.hd44780.write_str(&content, delay)?;
         Ok(())
     }
 }
 
-fn height_to_string(height: u32) -> Result<ArrayString<[u8; 0]>, fmt::Error> {
-    let mut content = ArrayString::<[_; 0]>::new();
+fn height_to_string(height: u32) -> Result<ArrayString<[u8; 5]>, fmt::Error> {
+    let mut content = ArrayString::<[_; 5]>::new();
     write!(content, "{:02}mm", height)?;
 
     Ok(content)
