@@ -111,7 +111,7 @@ where
             home_switch,
 
             current_height: None,
-            target_height: 20,
+            target_height: 0,
 
             max_height,
             motor_steps_per_mm,
@@ -131,16 +131,16 @@ where
             if current_height > self.target_height {
                 self.motor
                     .rotate_counter_clockwise(self.motor_steps_per_tick, delay)?;
-                self.current_height
-                    .replace(current_height + self.motor_steps_per_tick);
-            } else if current_height < self.target_height {
-                self.motor
-                    .rotate_clockwise(self.motor_steps_per_tick, delay)?;
                 self.current_height.replace(
                     current_height
                         .checked_sub(self.motor_steps_per_tick)
                         .unwrap_or(0),
                 );
+            } else if current_height < self.target_height {
+                self.motor
+                    .rotate_clockwise(self.motor_steps_per_tick, delay)?;
+                self.current_height
+                    .replace(current_height + self.motor_steps_per_tick);
             }
         } else {
             self.motor
@@ -193,7 +193,7 @@ where
         delay: &mut (impl DelayUs<u16> + DelayMs<u8>),
     ) -> Result<(), Error<SIA, SIB, LIM, STP, DIR, MEN, M1, M2, M3>> {
         self.current_height = Some(0);
-        self.target_height = 25;
+        self.target_height = 0;
         self.update_screen(delay)
     }
 
