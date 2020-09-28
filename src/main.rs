@@ -1,7 +1,6 @@
 #![no_std]
 #![no_main]
 
-use cortex_m_semihosting::hprintln;
 use panic_semihosting as _;
 
 use core::cell::RefCell;
@@ -23,6 +22,7 @@ use stm32f1xx_hal::{
     },
     pac::{CorePeripherals, Interrupt, Peripherals, NVIC},
     prelude::*,
+    rtc::Rtc,
 };
 
 const MOTOR_MODE: Mode = Mode::FullStep;
@@ -30,6 +30,7 @@ const MM_STEPS: u32 = 200;
 const STEPS_PER_LOOP: u32 = 1;
 const SIGNAL_DELAY: u8 = 1;
 
+static RTC: Mutex<RefCell<Option<Rtc>>> = Mutex::new(RefCell::new(None));
 static DELAY: Mutex<RefCell<Option<Delay>>> = Mutex::new(RefCell::new(None));
 static MILL: Mutex<
     RefCell<
@@ -65,6 +66,7 @@ fn main() -> ! {
     let mut rcc = peripherals.RCC.constrain();
     let mut flash = peripherals.FLASH.constrain();
     let mut afio = peripherals.AFIO.constrain(&mut rcc.apb2);
+    let mut pwr = peripherals.PWR;
     let mut gpioa = peripherals.GPIOA.split(&mut rcc.apb2);
     let mut gpiob = peripherals.GPIOB.split(&mut rcc.apb2);
     let clocks = rcc.cfgr.freeze(&mut flash.acr);
@@ -82,8 +84,12 @@ fn main() -> ! {
 
     let mut limit_switch = gpioa.pa2.into_pull_down_input(&mut gpioa.crl);
     limit_switch.make_interrupt_source(&mut afio);
-    limit_switch.trigger_on_edge(&peripherals.EXTI, Edge::FALLING);
+    limit_switch.trigger_on_edge(&peripherals.EXTI, Edge::RISING);
     limit_switch.enable_interrupt(&peripherals.EXTI);
+
+    let mut backup_domain = rcc.bkp.constrain(peripherals.BKP, &mut rcc.apb1, &mut pwr);
+
+    let rtc = Rtc::rtc(peripherals.RTC, &mut backup_domain);
 
     unsafe {
         NVIC::unmask(Interrupt::EXTI0);
@@ -126,7 +132,7 @@ fn main() -> ! {
             limit_switch,
             home_switch,
 
-            max_height: 45 * MM_STEPS,
+            max_height: 48 * MM_STEPS,
             motor_steps_per_tick: STEPS_PER_LOOP,
             motor_steps_per_mm: MM_STEPS,
         },
@@ -138,14 +144,18 @@ fn main() -> ! {
     interrupt_free(|cs| {
         MILL.borrow(cs).replace(Some(mill));
         DELAY.borrow(cs).replace(Some(delay));
+        RTC.borrow(cs).replace(Some(rtc));
     });
 
     loop {
         interrupt_free(|cs| {
             let mut option = MILL.borrow(cs).borrow_mut();
             let mut delay = DELAY.borrow(cs).borrow_mut();
-            if let (Some(mill), Some(delay)) = (option.as_mut(), delay.as_mut()) {
-                mill.tick(delay).ok().unwrap();
+            let rtc = RTC.borrow(cs).borrow_mut();
+            if let (Some(mill), Some(delay), Some(rtc)) =
+                (option.as_mut(), delay.as_mut(), rtc.as_ref())
+            {
+                mill.tick(delay, rtc).ok().unwrap();
             }
         });
     }
@@ -156,12 +166,14 @@ fn EXTI0() {
     interrupt_free(|cs| {
         let mut mill = MILL.borrow(cs).borrow_mut();
         let mut delay = DELAY.borrow(cs).borrow_mut();
-        if let (Some(mill), Some(delay)) = (mill.as_mut(), delay.as_mut()) {
+        let mut rtc = RTC.borrow(cs).borrow_mut();
+        if let (Some(mill), Some(delay), Some(rtc)) = (mill.as_mut(), delay.as_mut(), rtc.as_mut())
+        {
             if !mill.encoder.sia.check_interrupt() {
                 return;
             }
 
-            mill.handle_sia_interrupt(delay).ok().unwrap();
+            mill.handle_sia_interrupt(delay, rtc).ok().unwrap();
             mill.encoder.sia.clear_interrupt_pending_bit();
         }
     });
