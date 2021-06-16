@@ -8,7 +8,7 @@ use cortex_m::interrupt::{free as interrupt_free, Mutex};
 use cortex_m_rt::entry;
 use mill::{
     rotary_encoder::RotaryEncoder,
-    screen::{Screen, ScreenConfig},
+    screen::{Frame, Screen, ScreenConfig},
     stepper_motor::{Duration, Mode, StepperMotor, StepperMotorConfig},
     Mill, MillConfig,
 };
@@ -96,6 +96,23 @@ fn main() -> ! {
         NVIC::unmask(Interrupt::EXTI1);
         NVIC::unmask(Interrupt::EXTI2);
     };
+
+    let screen = Screen::new(
+        ScreenConfig {
+            d7: gpioa.pa9.into_push_pull_output(&mut gpioa.crh),
+            d6: gpioa.pa8.into_push_pull_output(&mut gpioa.crh),
+            d5: gpiob.pb15.into_push_pull_output(&mut gpiob.crh),
+            d4: gpiob.pb14.into_push_pull_output(&mut gpiob.crh),
+            en: gpiob.pb13.into_push_pull_output(&mut gpiob.crh),
+            rs: gpiob.pb12.into_push_pull_output(&mut gpiob.crh),
+        },
+        &mut delay,
+    )
+    .ok()
+    .unwrap();
+
+    screen.update(Frame::Welcome, delay).ok().unwrap();
+    delay.delay_ms(1000);
 
     let mill = Mill::new(
         MillConfig {

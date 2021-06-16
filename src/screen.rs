@@ -76,6 +76,10 @@ where
                 self.hd44780.write_str("Kalibracja...", delay)?;
                 Ok(())
             }
+            Frame::Welcome => {
+                self.hd44780.write_str("Witaj!", delay)?;
+                Ok(())
+            }
         }
     }
 
@@ -135,4 +139,5 @@ where
 pub enum Frame {
     Height(u32),
     Calibrating,
+    Welcome,
 }
