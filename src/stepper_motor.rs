@@ -4,14 +4,13 @@ use embedded_hal::{
 };
 
 #[derive(Debug)]
-pub struct StepperMotor<S, DIR, EN, M1, M2, M3, DUR>
+pub struct StepperMotor<S, DIR, EN, M1, M2, DUR>
 where
     S: OutputPin,
     DIR: OutputPin,
     EN: OutputPin,
     M1: OutputPin,
     M2: OutputPin,
-    M3: OutputPin,
     DUR: Copy,
 {
     step: S,
@@ -19,32 +18,29 @@ where
     enable: EN,
     m1: M1,
     m2: M2,
-    m3: M3,
 
     signal_delay: Duration<DUR>,
     is_enabled: bool,
 }
 
-impl<STEP, DIR, EN, M1, M2, M3, DUR> StepperMotor<STEP, DIR, EN, M1, M2, M3, DUR>
+impl<STEP, DIR, EN, M1, M2, DUR> StepperMotor<STEP, DIR, EN, M1, M2, DUR>
 where
     STEP: OutputPin,
     DIR: OutputPin,
     EN: OutputPin,
     M1: OutputPin,
     M2: OutputPin,
-    M3: OutputPin,
     DUR: Copy,
 {
     pub fn new(
-        config: StepperMotorConfig<STEP, DIR, EN, M1, M2, M3, DUR>,
-    ) -> Result<Self, Error<STEP, DIR, EN, M1, M2, M3>> {
+        config: StepperMotorConfig<STEP, DIR, EN, M1, M2, DUR>,
+    ) -> Result<Self, Error<STEP, DIR, EN, M1, M2>> {
         let mut motor = Self {
             step: config.step,
             dir: config.dir,
             enable: config.enable,
             m1: config.m1,
             m2: config.m2,
-            m3: config.m3,
 
             signal_delay: config.signal_delay,
             is_enabled: false,
@@ -56,13 +52,11 @@ where
         Ok(motor)
     }
 
-    pub fn set_mode(&mut self, mode: Mode) -> Result<&mut Self, Error<STEP, DIR, EN, M1, M2, M3>> {
+    pub fn set_mode(&mut self, mode: Mode) -> Result<&mut Self, Error<STEP, DIR, EN, M1, M2>> {
         match mode {
-            Mode::FullStep => self.write_mode(false, false, false),
-            Mode::HalfStep => self.write_mode(true, false, false),
-            Mode::QuarterStep => self.write_mode(false, true, false),
-            Mode::EighthStep => self.write_mode(true, true, true),
-            Mode::SixteenthStep => self.write_mode(true, true, true),
+            Mode::QuarterStep => self.write_mode(false, false),
+            Mode::EighthStep => self.write_mode(false, true),
+            Mode::SixteenthStep => self.write_mode(true, false),
         }
     }
 
@@ -70,8 +64,7 @@ where
         &mut self,
         m1_state: bool,
         m2_state: bool,
-        m3_state: bool,
-    ) -> Result<&mut Self, Error<STEP, DIR, EN, M1, M2, M3>> {
+    ) -> Result<&mut Self, Error<STEP, DIR, EN, M1, M2>> {
         if m1_state {
             self.m1.set_high().map_err(|err| Error::M1(err))?;
         } else {
@@ -84,12 +77,6 @@ where
             self.m2.set_low().map_err(|err| Error::M2(err))?;
         }
 
-        if m3_state {
-            self.m3.set_high().map_err(|err| Error::M3(err))?;
-        } else {
-            self.m3.set_low().map_err(|err| Error::M3(err))?;
-        }
-
         Ok(self)
     }
 
@@ -97,7 +84,7 @@ where
         &mut self,
         steps: u32,
         delay: &mut (impl DelayMs<DUR> + DelayUs<DUR>),
-    ) -> Result<(), Error<STEP, DIR, EN, M1, M2, M3>> {
+    ) -> Result<(), Error<STEP, DIR, EN, M1, M2>> {
         self.dir.set_high().map_err(|err| Error::Dir(err))?;
         self.rotate(steps, delay)
     }
@@ -106,12 +93,12 @@ where
         &mut self,
         steps: u32,
         delay: &mut (impl DelayMs<DUR> + DelayUs<DUR>),
-    ) -> Result<(), Error<STEP, DIR, EN, M1, M2, M3>> {
+    ) -> Result<(), Error<STEP, DIR, EN, M1, M2>> {
         self.dir.set_low().map_err(|err| Error::Dir(err))?;
         self.rotate(steps, delay)
     }
 
-    pub fn enable(&mut self) -> Result<(), Error<STEP, DIR, EN, M1, M2, M3>> {
+    pub fn enable(&mut self) -> Result<(), Error<STEP, DIR, EN, M1, M2>> {
         let result = self.enable.set_low();
         if result.is_ok() {
             self.is_enabled = true;
@@ -123,7 +110,7 @@ where
         self.is_enabled
     }
 
-    pub fn disable(&mut self) -> Result<(), Error<STEP, DIR, EN, M1, M2, M3>> {
+    pub fn disable(&mut self) -> Result<(), Error<STEP, DIR, EN, M1, M2>> {
         let result = self.enable.set_high();
         if result.is_ok() {
             self.is_enabled = false;
@@ -135,7 +122,7 @@ where
         &mut self,
         steps: u32,
         delay: &mut (impl DelayMs<DUR> + DelayUs<DUR>),
-    ) -> Result<(), Error<STEP, DIR, EN, M1, M2, M3>> {
+    ) -> Result<(), Error<STEP, DIR, EN, M1, M2>> {
         let was_enabled = self.is_enabled;
 
         if !was_enabled {
@@ -158,21 +145,19 @@ where
 }
 
 #[derive(Debug)]
-pub struct StepperMotorConfig<S, D, E, M1, M2, M3, DUR>
+pub struct StepperMotorConfig<S, D, E, M1, M2, DUR>
 where
     S: OutputPin,
     D: OutputPin,
     E: OutputPin,
     M1: OutputPin,
     M2: OutputPin,
-    M3: OutputPin,
 {
     pub step: S,
     pub dir: D,
     pub enable: E,
     pub m1: M1,
     pub m2: M2,
-    pub m3: M3,
     pub mode: Mode,
     pub signal_delay: Duration<DUR>,
 }
@@ -194,27 +179,23 @@ impl<T: Copy> Duration<T> {
 
 #[derive(Debug, Copy, Clone)]
 pub enum Mode {
-    FullStep,
-    HalfStep,
     QuarterStep,
     EighthStep,
     SixteenthStep,
 }
 
 #[derive(Debug)]
-pub enum Error<S, D, E, M1, M2, M3>
+pub enum Error<S, D, E, M1, M2>
 where
     S: OutputPin,
     D: OutputPin,
     E: OutputPin,
     M1: OutputPin,
     M2: OutputPin,
-    M3: OutputPin,
 {
     Step(S::Error),
     Dir(D::Error),
     Enable(E::Error),
     M1(M1::Error),
     M2(M2::Error),
-    M3(M3::Error),
 }

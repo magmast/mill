@@ -13,7 +13,7 @@ use screen::{Frame, Screen, ScreenUpdateError};
 use stepper_motor::StepperMotor;
 use stm32f1xx_hal::rtc::Rtc;
 
-pub struct Mill<SIA, SIB, HOM, LIM, STP, DIR, MEN, M1, M2, M3, DUR, RS, SEN, D4, D5, D6, D7>
+pub struct Mill<SIA, SIB, HOM, LIM, STP, DIR, MEN, M1, M2, DUR, RS, SEN, D4, D5, D6, D7>
 where
     SIA: InputPin,
     SIB: InputPin,
@@ -24,7 +24,6 @@ where
     MEN: OutputPin,
     M1: OutputPin,
     M2: OutputPin,
-    M3: OutputPin,
     DUR: Copy,
     RS: OutputPin,
     SEN: OutputPin,
@@ -34,7 +33,7 @@ where
     D7: OutputPin,
 {
     pub encoder: RotaryEncoder<SIA, SIB>,
-    motor: StepperMotor<STP, DIR, MEN, M1, M2, M3, DUR>,
+    motor: StepperMotor<STP, DIR, MEN, M1, M2, DUR>,
     screen: Screen<RS, SEN, D4, D5, D6, D7>,
     pub limit_switch: LIM,
     pub home_switch: HOM,
@@ -47,8 +46,8 @@ where
     max_height: u32,
 }
 
-impl<SIA, SIB, HOM, LIM, STP, DIR, MEN, M1, M2, M3, DUR, RS, SEN, D4, D5, D6, D7>
-    Mill<SIA, SIB, HOM, LIM, STP, DIR, MEN, M1, M2, M3, DUR, RS, SEN, D4, D5, D6, D7>
+impl<SIA, SIB, HOM, LIM, STP, DIR, MEN, M1, M2, DUR, RS, SEN, D4, D5, D6, D7>
+    Mill<SIA, SIB, HOM, LIM, STP, DIR, MEN, M1, M2, DUR, RS, SEN, D4, D5, D6, D7>
 where
     SIA: InputPin,
     SIB: InputPin,
@@ -59,7 +58,6 @@ where
     MEN: OutputPin,
     M1: OutputPin,
     M2: OutputPin,
-    M3: OutputPin,
     DUR: Copy,
     RS: OutputPin,
     SEN: OutputPin,
@@ -69,27 +67,9 @@ where
     D7: OutputPin,
 {
     pub fn new(
-        config: MillConfig<
-            SIA,
-            SIB,
-            HOM,
-            LIM,
-            STP,
-            DIR,
-            MEN,
-            M1,
-            M2,
-            M3,
-            DUR,
-            RS,
-            SEN,
-            D4,
-            D5,
-            D6,
-            D7,
-        >,
+        config: MillConfig<SIA, SIB, HOM, LIM, STP, DIR, MEN, M1, M2, DUR, RS, SEN, D4, D5, D6, D7>,
         delay: &mut (impl DelayMs<u8> + DelayUs<u16>),
-    ) -> Result<Self, Error<SIA, SIB, LIM, STP, DIR, MEN, M1, M2, M3>> {
+    ) -> Result<Self, Error<SIA, SIB, LIM, STP, DIR, MEN, M1, M2>> {
         let MillConfig {
             encoder,
             motor,
@@ -127,7 +107,7 @@ where
         &mut self,
         delay: &mut (impl DelayMs<DUR> + DelayUs<DUR> + DelayMs<u8> + DelayUs<u16>),
         rtc: &Rtc,
-    ) -> Result<(), Error<SIA, SIB, LIM, STP, DIR, MEN, M1, M2, M3>> {
+    ) -> Result<(), Error<SIA, SIB, LIM, STP, DIR, MEN, M1, M2>> {
         if let Some(current_height) = self.current_height {
             if rtc.current_time() < 1 {
                 return Ok(());
@@ -164,7 +144,7 @@ where
         &mut self,
         delay: &mut (impl DelayMs<u8> + DelayUs<u16>),
         rtc: &mut Rtc,
-    ) -> Result<(), Error<SIA, SIB, LIM, STP, DIR, MEN, M1, M2, M3>> {
+    ) -> Result<(), Error<SIA, SIB, LIM, STP, DIR, MEN, M1, M2>> {
         match self.encoder.update()? {
             Rotation::Clockwise => {
                 self.target_height += self.motor_steps_per_mm;
@@ -187,7 +167,7 @@ where
     pub fn handle_home_switch_interrupt(
         &mut self,
         delay: &mut (impl DelayUs<u16> + DelayMs<u8>),
-    ) -> Result<(), Error<SIA, SIB, LIM, STP, DIR, MEN, M1, M2, M3>> {
+    ) -> Result<(), Error<SIA, SIB, LIM, STP, DIR, MEN, M1, M2>> {
         self.current_height = None;
         self.update_screen(delay)
     }
@@ -195,7 +175,7 @@ where
     pub fn handle_limit_switch_interrupt(
         &mut self,
         delay: &mut (impl DelayUs<u16> + DelayMs<u8> + DelayUs<DUR> + DelayMs<DUR>),
-    ) -> Result<(), Error<SIA, SIB, LIM, STP, DIR, MEN, M1, M2, M3>> {
+    ) -> Result<(), Error<SIA, SIB, LIM, STP, DIR, MEN, M1, M2>> {
         self.current_height = Some(self.motor_steps_per_mm);
         self.target_height = self.motor_steps_per_mm;
         self.motor
@@ -206,7 +186,7 @@ where
     fn update_screen(
         &mut self,
         delay: &mut (impl DelayMs<u8> + DelayUs<u16>),
-    ) -> Result<(), Error<SIA, SIB, LIM, STP, DIR, MEN, M1, M2, M3>> {
+    ) -> Result<(), Error<SIA, SIB, LIM, STP, DIR, MEN, M1, M2>> {
         if let Some(_) = self.current_height {
             self.screen.update(
                 Frame::Height(self.target_height / self.motor_steps_per_mm),
@@ -220,7 +200,7 @@ where
     }
 }
 
-pub struct MillConfig<SIA, SIB, HOM, LIM, STP, DIR, MEN, M1, M2, M3, DUR, RS, SEN, D4, D5, D6, D7>
+pub struct MillConfig<SIA, SIB, HOM, LIM, STP, DIR, MEN, M1, M2, DUR, RS, SEN, D4, D5, D6, D7>
 where
     SIA: InputPin,
     SIB: InputPin,
@@ -231,7 +211,6 @@ where
     MEN: OutputPin,
     M1: OutputPin,
     M2: OutputPin,
-    M3: OutputPin,
     DUR: Copy,
     RS: OutputPin,
     SEN: OutputPin,
@@ -242,7 +221,7 @@ where
 {
     pub encoder: RotaryEncoder<SIA, SIB>,
     pub screen: Screen<RS, SEN, D4, D5, D6, D7>,
-    pub motor: StepperMotor<STP, DIR, MEN, M1, M2, M3, DUR>,
+    pub motor: StepperMotor<STP, DIR, MEN, M1, M2, DUR>,
     pub home_switch: HOM,
     pub limit_switch: LIM,
 
@@ -251,7 +230,7 @@ where
     pub motor_steps_per_mm: u32,
 }
 
-pub enum Error<SIA, SIB, LIM, STP, DIR, EN, M1, M2, M3>
+pub enum Error<SIA, SIB, LIM, STP, DIR, EN, M1, M2>
 where
     SIA: InputPin,
     SIB: InputPin,
@@ -261,17 +240,16 @@ where
     EN: OutputPin,
     M1: OutputPin,
     M2: OutputPin,
-    M3: OutputPin,
 {
     Encoder(rotary_encoder::Error<SIA, SIB>),
     LimitSwitch(LIM::Error),
-    Motor(stepper_motor::Error<STP, DIR, EN, M1, M2, M3>),
+    Motor(stepper_motor::Error<STP, DIR, EN, M1, M2>),
     ScreenUpdate(ScreenUpdateError),
     Sia(SIA::Error),
 }
 
-impl<SIA, SIB, LIM, STP, DIR, EN, M1, M2, M3> From<rotary_encoder::Error<SIA, SIB>>
-    for Error<SIA, SIB, LIM, STP, DIR, EN, M1, M2, M3>
+impl<SIA, SIB, LIM, STP, DIR, EN, M1, M2> From<rotary_encoder::Error<SIA, SIB>>
+    for Error<SIA, SIB, LIM, STP, DIR, EN, M1, M2>
 where
     SIA: InputPin,
     SIB: InputPin,
@@ -281,15 +259,14 @@ where
     EN: OutputPin,
     M1: OutputPin,
     M2: OutputPin,
-    M3: OutputPin,
 {
     fn from(err: rotary_encoder::Error<SIA, SIB>) -> Self {
         Self::Encoder(err)
     }
 }
 
-impl<SIA, SIB, LIM, STP, DIR, EN, M1, M2, M3> From<ScreenUpdateError>
-    for Error<SIA, SIB, LIM, STP, DIR, EN, M1, M2, M3>
+impl<SIA, SIB, LIM, STP, DIR, EN, M1, M2> From<ScreenUpdateError>
+    for Error<SIA, SIB, LIM, STP, DIR, EN, M1, M2>
 where
     SIA: InputPin,
     SIB: InputPin,
@@ -299,15 +276,14 @@ where
     EN: OutputPin,
     M1: OutputPin,
     M2: OutputPin,
-    M3: OutputPin,
 {
     fn from(err: ScreenUpdateError) -> Self {
         Self::ScreenUpdate(err)
     }
 }
 
-impl<SIA, SIB, LIM, STP, DIR, EN, M1, M2, M3> From<stepper_motor::Error<STP, DIR, EN, M1, M2, M3>>
-    for Error<SIA, SIB, LIM, STP, DIR, EN, M1, M2, M3>
+impl<SIA, SIB, LIM, STP, DIR, EN, M1, M2> From<stepper_motor::Error<STP, DIR, EN, M1, M2>>
+    for Error<SIA, SIB, LIM, STP, DIR, EN, M1, M2>
 where
     SIA: InputPin,
     SIB: InputPin,
@@ -317,9 +293,8 @@ where
     EN: OutputPin,
     M1: OutputPin,
     M2: OutputPin,
-    M3: OutputPin,
 {
-    fn from(err: stepper_motor::Error<STP, DIR, EN, M1, M2, M3>) -> Self {
+    fn from(err: stepper_motor::Error<STP, DIR, EN, M1, M2>) -> Self {
         Self::Motor(err)
     }
 }

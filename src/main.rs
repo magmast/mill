@@ -17,7 +17,7 @@ use stm32f1xx_hal::{
     device::interrupt,
     gpio::{
         gpioa::{PA1, PA10, PA11, PA12, PA2, PA8, PA9},
-        gpiob::{PB0, PB1, PB12, PB13, PB14, PB15, PB5, PB6, PB7},
+        gpiob::{PB0, PB1, PB12, PB13, PB14, PB15, PB6, PB7},
         Edge, ExtiPin, Input, Output, PullDown, PushPull,
     },
     pac::{CorePeripherals, Interrupt, Peripherals, NVIC},
@@ -25,8 +25,8 @@ use stm32f1xx_hal::{
     rtc::Rtc,
 };
 
-const MOTOR_MODE: Mode = Mode::FullStep;
-const MM_STEPS: u32 = 200;
+const MOTOR_MODE: Mode = Mode::QuarterStep;
+const MM_STEPS: u32 = 214 * 4;
 const STEPS_PER_LOOP: u32 = 1;
 const SIGNAL_DELAY: u8 = 1;
 
@@ -45,7 +45,6 @@ static MILL: Mutex<
                 PA10<Output<PushPull>>,
                 PA11<Output<PushPull>>,
                 PA12<Output<PushPull>>,
-                PB5<Output<PushPull>>,
                 u8,
                 PB12<Output<PushPull>>,
                 PB13<Output<PushPull>>,
@@ -97,7 +96,7 @@ fn main() -> ! {
         NVIC::unmask(Interrupt::EXTI2);
     };
 
-    let screen = Screen::new(
+    let mut screen = Screen::new(
         ScreenConfig {
             d7: gpioa.pa9.into_push_pull_output(&mut gpioa.crh),
             d6: gpioa.pa8.into_push_pull_output(&mut gpioa.crh),
@@ -111,31 +110,18 @@ fn main() -> ! {
     .ok()
     .unwrap();
 
-    screen.update(Frame::Welcome, delay).ok().unwrap();
-    delay.delay_ms(1000);
+    screen.update(Frame::Welcome, &mut delay).ok().unwrap();
+    delay.delay_ms(1000u16);
 
     let mill = Mill::new(
         MillConfig {
             encoder: RotaryEncoder::new(sia, gpiob.pb1.into_pull_down_input(&mut gpiob.crl)),
 
-            screen: Screen::new(
-                ScreenConfig {
-                    d7: gpioa.pa9.into_push_pull_output(&mut gpioa.crh),
-                    d6: gpioa.pa8.into_push_pull_output(&mut gpioa.crh),
-                    d5: gpiob.pb15.into_push_pull_output(&mut gpiob.crh),
-                    d4: gpiob.pb14.into_push_pull_output(&mut gpiob.crh),
-                    en: gpiob.pb13.into_push_pull_output(&mut gpiob.crh),
-                    rs: gpiob.pb12.into_push_pull_output(&mut gpiob.crh),
-                },
-                &mut delay,
-            )
-            .ok()
-            .unwrap(),
+            screen,
 
             motor: StepperMotor::new(StepperMotorConfig {
                 dir: gpiob.pb7.into_push_pull_output(&mut gpiob.crl),
                 step: gpiob.pb6.into_push_pull_output(&mut gpiob.crl),
-                m3: gpiob.pb5.into_push_pull_output(&mut gpiob.crl),
                 m2: gpioa.pa12.into_push_pull_output(&mut gpioa.crh),
                 m1: gpioa.pa11.into_push_pull_output(&mut gpioa.crh),
                 enable: gpioa.pa10.into_push_pull_output(&mut gpioa.crh),
