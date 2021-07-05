@@ -26,7 +26,7 @@ use stm32f1xx_hal::{
 };
 
 const MOTOR_MODE: Mode = Mode::QuarterStep;
-const MM_STEPS: u32 = 214 * 4;
+const MM_STEPS: u32 = 200 * 4;
 const STEPS_PER_LOOP: u32 = 1;
 const SIGNAL_DELAY: u8 = 1;
 
