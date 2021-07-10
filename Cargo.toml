@@ -20,9 +20,9 @@ default-features = false
 [dependencies.hd44780-driver]
 git = "https://github.com/JohnDoneth/hd44780-driver"
 
-[dependencies.stm32f1xx-hal]
-version = "0.6.1"
-features = ["medium", "rt", "stm32f103"]
+[dependencies.stm32f4xx-hal] 
+version = "0.9.0"
+features = ["rt", "stm32f401"]
 
 [[bin]]
 name = "mill"
