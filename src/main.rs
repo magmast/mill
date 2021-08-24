@@ -55,6 +55,14 @@ static MILL: Mutex<
     >,
 > = Mutex::new(RefCell::new(None));
 
+// If `COUNTDOWN` is greater than 0, main loop will decrease it instead of
+// rotating the motor. It is set by encoder interrupt, so there is a delay
+// between user input and motor rotation.
+static COUNTDOWN: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
+
+// Number of ticks required to start rotating motor after user input.
+const COUNTDOWN_VALUE: u32 = 1000;
+
 #[entry]
 fn main() -> ! {
     let core_peripherals = CorePeripherals::take().unwrap();
@@ -143,6 +151,12 @@ fn main() -> ! {
 
     loop {
         interrupt_free(|cs| {
+            let mut countdown = COUNTDOWN.borrow(cs).borrow_mut();
+            if *countdown > 0 {
+                *countdown -= 1;
+                return;
+            }
+
             let mut option = MILL.borrow(cs).borrow_mut();
             let mut delay = DELAY.borrow(cs).borrow_mut();
             if let (Some(mill), Some(delay)) = (option.as_mut(), delay.as_mut()) {
@@ -155,6 +169,9 @@ fn main() -> ! {
 #[interrupt]
 fn EXTI0() {
     interrupt_free(|cs| {
+        let mut countdown = COUNTDOWN.borrow(cs).borrow_mut();
+        *countdown = COUNTDOWN_VALUE;
+
         let mut mill = MILL.borrow(cs).borrow_mut();
         let mut delay = DELAY.borrow(cs).borrow_mut();
         if let (Some(mill), Some(delay)) = (mill.as_mut(), delay.as_mut()) {
