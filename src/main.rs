@@ -22,11 +22,24 @@ use stm32f4xx_hal::{
     interrupt,
     pac::{CorePeripherals, Interrupt, Peripherals, NVIC},
     prelude::*,
+    timer::MonoTimer,
 };
 
+// If you change this, you should propably change `MM_STEPS` too.
 const MOTOR_MODE: Mode = Mode::QuarterStep;
+
+// How many steps is one milimeter.
 const MM_STEPS: u32 = 200 * 4;
+
+// Main loop doesn't rotate motor to the specified height at once, as rotation
+// executes inside `interrupt_free` block, so it would block any user
+// interaction until motor stops rotating and it would be frustrating. So
+// it rotates motor just a bit and exists `interrupt_free` block so user can
+// interrupt motor rotation. This variable defines how many steps motor rotates
+// per `interrupt_free` block.
 const STEPS_PER_LOOP: u32 = 1;
+
+// Interval between signals send to the stepper motor driver.
 const SIGNAL_DELAY: u8 = 1;
 
 static DELAY: Mutex<RefCell<Option<Delay>>> = Mutex::new(RefCell::new(None));
@@ -55,13 +68,13 @@ static MILL: Mutex<
     >,
 > = Mutex::new(RefCell::new(None));
 
-// If `COUNTDOWN` is greater than 0, main loop will decrease it instead of
-// rotating the motor. It is set by encoder interrupt, so there is a delay
-// between user input and motor rotation.
-static COUNTDOWN: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
-
-// Number of ticks required to start rotating motor after user input.
-const COUNTDOWN_VALUE: u32 = 1000;
+// Motor cannot start rotating instantly after user changes height, as it
+// results in invalid height (for whatever reason...). Following variables
+// are used to communicate sia interrupt handler with the main loop and to
+// change delay duration.
+static TIMER: Mutex<RefCell<Option<MonoTimer>>> = Mutex::new(RefCell::new(None));
+static LAST_SIA_INTERRUPT: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
+const SIA_ROTATION_DELAY: u32 = 100;
 
 #[entry]
 fn main() -> ! {
@@ -144,16 +157,19 @@ fn main() -> ! {
     .ok()
     .unwrap();
 
+    let timer = MonoTimer::new(core_peripherals.DWT, core_peripherals.DCB, clocks);
+
     interrupt_free(|cs| {
         MILL.borrow(cs).replace(Some(mill));
         DELAY.borrow(cs).replace(Some(delay));
+        TIMER.borrow(cs).replace(Some(timer));
     });
 
     loop {
         interrupt_free(|cs| {
-            let mut countdown = COUNTDOWN.borrow(cs).borrow_mut();
-            if *countdown > 0 {
-                *countdown -= 1;
+            let timer = TIMER.borrow(cs).borrow();
+            let last_sia = LAST_SIA_INTERRUPT.borrow(cs).borrow();
+            if timer.unwrap().now().elapsed() - *last_sia < SIA_ROTATION_DELAY {
                 return;
             }
 
@@ -169,16 +185,15 @@ fn main() -> ! {
 #[interrupt]
 fn EXTI0() {
     interrupt_free(|cs| {
-        let mut countdown = COUNTDOWN.borrow(cs).borrow_mut();
-        *countdown = COUNTDOWN_VALUE;
-
         let mut mill = MILL.borrow(cs).borrow_mut();
         let mut delay = DELAY.borrow(cs).borrow_mut();
-        if let (Some(mill), Some(delay)) = (mill.as_mut(), delay.as_mut()) {
+        let timer = TIMER.borrow(cs).borrow();
+        if let (Some(mill), Some(delay), Some(timer)) = (mill.as_mut(), delay.as_mut(), *timer) {
             if !mill.encoder.sia.check_interrupt() {
                 return;
             }
 
+            LAST_SIA_INTERRUPT.borrow(cs).replace(timer.now().elapsed());
             mill.handle_sia_interrupt(delay).ok().unwrap();
             mill.encoder.sia.clear_interrupt_pending_bit();
         }
