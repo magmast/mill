@@ -12,6 +12,7 @@ cortex-m-semihosting = "0.3.3"
 embedded-hal = "0.2.4"
 panic-halt = "0.2.0"
 panic-semihosting = "0.5.3"
+rtcc = "0.2.1"
 
 [dependencies.arrayvec]
 version = "0.5.1"

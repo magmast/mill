@@ -54,9 +54,9 @@ where
 
     pub fn set_mode(&mut self, mode: Mode) -> Result<&mut Self, Error<STEP, DIR, EN, M1, M2>> {
         match mode {
-            Mode::QuarterStep => self.write_mode(false, false),
-            Mode::EighthStep => self.write_mode(false, true),
-            Mode::SixteenthStep => self.write_mode(true, false),
+            Mode::FullStep => self.write_mode(false, false),
+            Mode::HalfStep => self.write_mode(true, false),
+            Mode::QuarterStep => self.write_mode(false, true),
         }
     }
 
@@ -179,9 +179,9 @@ impl<T: Copy> Duration<T> {
 
 #[derive(Debug, Copy, Clone)]
 pub enum Mode {
+    FullStep,
+    HalfStep,
     QuarterStep,
-    EighthStep,
-    SixteenthStep,
 }
 
 #[derive(Debug)]

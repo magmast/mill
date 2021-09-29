@@ -22,14 +22,14 @@ use stm32f4xx_hal::{
     interrupt,
     pac::{CorePeripherals, Interrupt, Peripherals, NVIC},
     prelude::*,
-    timer::MonoTimer,
+    rtc::Rtc,
 };
 
 // If you change this, you should propably change `MM_STEPS` too.
-const MOTOR_MODE: Mode = Mode::QuarterStep;
+const MOTOR_MODE: Mode = Mode::FullStep;
 
 // How many steps is one milimeter.
-const MM_STEPS: u32 = 200 * 4;
+const MM_STEPS: u32 = 200;
 
 // Main loop doesn't rotate motor to the specified height at once, as rotation
 // executes inside `interrupt_free` block, so it would block any user
@@ -67,14 +67,7 @@ static MILL: Mutex<
         >,
     >,
 > = Mutex::new(RefCell::new(None));
-
-// Motor cannot start rotating instantly after user changes height, as it
-// results in invalid height (for whatever reason...). Following variables
-// are used to communicate sia interrupt handler with the main loop and to
-// change delay duration.
-static TIMER: Mutex<RefCell<Option<MonoTimer>>> = Mutex::new(RefCell::new(None));
-static LAST_SIA_INTERRUPT: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
-const SIA_ROTATION_DELAY: u32 = 100;
+static RTC: Mutex<RefCell<Option<Rtc>>> = Mutex::new(RefCell::new(None));
 
 #[entry]
 fn main() -> ! {
@@ -109,6 +102,8 @@ fn main() -> ! {
         NVIC::unmask(Interrupt::EXTI2);
     };
 
+    let rtc = Rtc::new(peripherals.RTC, 255, 127, false, &mut peripherals.PWR);
+
     let mut screen = Screen::new(
         ScreenConfig {
             d7: gpioa.pa9.into_push_pull_output(),
@@ -124,7 +119,7 @@ fn main() -> ! {
     .unwrap();
 
     screen.update(Frame::Welcome, &mut delay).ok().unwrap();
-    delay.delay_ms(1000u16);
+    delay.delay_ms(5000u16);
 
     let mill = Mill::new(
         MillConfig {
@@ -157,26 +152,21 @@ fn main() -> ! {
     .ok()
     .unwrap();
 
-    let timer = MonoTimer::new(core_peripherals.DWT, core_peripherals.DCB, clocks);
-
     interrupt_free(|cs| {
         MILL.borrow(cs).replace(Some(mill));
         DELAY.borrow(cs).replace(Some(delay));
-        TIMER.borrow(cs).replace(Some(timer));
+        RTC.borrow(cs).replace(Some(rtc));
     });
 
     loop {
         interrupt_free(|cs| {
-            let timer = TIMER.borrow(cs).borrow();
-            let last_sia = LAST_SIA_INTERRUPT.borrow(cs).borrow();
-            if timer.unwrap().now().elapsed() - *last_sia < SIA_ROTATION_DELAY {
-                return;
-            }
-
             let mut option = MILL.borrow(cs).borrow_mut();
             let mut delay = DELAY.borrow(cs).borrow_mut();
-            if let (Some(mill), Some(delay)) = (option.as_mut(), delay.as_mut()) {
-                mill.tick(delay).ok().unwrap();
+            let mut rtc = RTC.borrow(cs).borrow_mut();
+            if let (Some(mill), Some(delay), Some(rtc)) =
+                (option.as_mut(), delay.as_mut(), rtc.as_mut())
+            {
+                mill.tick(delay, rtc).ok().unwrap();
             }
         });
     }
@@ -187,14 +177,14 @@ fn EXTI0() {
     interrupt_free(|cs| {
         let mut mill = MILL.borrow(cs).borrow_mut();
         let mut delay = DELAY.borrow(cs).borrow_mut();
-        let timer = TIMER.borrow(cs).borrow();
-        if let (Some(mill), Some(delay), Some(timer)) = (mill.as_mut(), delay.as_mut(), *timer) {
+        let mut rtc = RTC.borrow(cs).borrow_mut();
+        if let (Some(mill), Some(delay), Some(rtc)) = (mill.as_mut(), delay.as_mut(), rtc.as_mut())
+        {
             if !mill.encoder.sia.check_interrupt() {
                 return;
             }
 
-            LAST_SIA_INTERRUPT.borrow(cs).replace(timer.now().elapsed());
-            mill.handle_sia_interrupt(delay).ok().unwrap();
+            mill.handle_sia_interrupt(delay, rtc).ok().unwrap();
             mill.encoder.sia.clear_interrupt_pending_bit();
         }
     });

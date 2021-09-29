@@ -9,6 +9,7 @@ use embedded_hal::{
     digital::v2::{InputPin, OutputPin},
 };
 use rotary_encoder::{RotaryEncoder, Rotation};
+use rtcc::Rtcc;
 use screen::{Frame, Screen, ScreenUpdateError};
 use stepper_motor::StepperMotor;
 
@@ -105,8 +106,17 @@ where
     pub fn tick(
         &mut self,
         delay: &mut (impl DelayMs<DUR> + DelayUs<DUR> + DelayMs<u8> + DelayUs<u16>),
+        rtc: &mut impl Rtcc,
     ) -> Result<(), Error<SIA, SIB, LIM, STP, DIR, MEN, M1, M2>> {
         if let Some(current_height) = self.current_height {
+            if rtc
+                .get_seconds()
+                .map(|seconds| seconds < 1)
+                .unwrap_or(false)
+            {
+                return Ok(());
+            }
+
             if current_height > self.target_height {
                 self.motor
                     .rotate_counter_clockwise(self.motor_steps_per_tick, delay)?;
@@ -137,6 +147,7 @@ where
     pub fn handle_sia_interrupt(
         &mut self,
         delay: &mut (impl DelayMs<u8> + DelayUs<u16>),
+        rtc: &mut impl Rtcc,
     ) -> Result<(), Error<SIA, SIB, LIM, STP, DIR, MEN, M1, M2>> {
         match self.encoder.update()? {
             Rotation::Clockwise => {
@@ -153,6 +164,7 @@ where
             }
             _ => {}
         }
+        rtc.set_seconds(0);
         self.update_screen(delay)
     }
 
